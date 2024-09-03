@@ -24,6 +24,8 @@ local function changedRefreshHandler(err, result, ctx, _)
 		return
 	end
 
+	local row, _ = unpack(vim.api.nvim_win_get_cursor(0))
+
 	local config = require("lsp-endhints.config").config
 	local padding = (" "):rep(config.label.padding)
 	local marginLeft = (" "):rep(config.label.marginLeft)
@@ -34,28 +36,32 @@ local function changedRefreshHandler(err, result, ctx, _)
 	-- below. This ensures that the hints are displayed in the correct order.
 	local hintLines = vim.iter(result):fold({}, function(acc, hint)
 		local lnum = hint.position.line
-		local col = hint.position.character
-		-- label is either string or `InlayHintLabelPart[]` https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHint
-		local label = hint.label
-		if type(label) ~= "string" then
-			label = vim.iter(hint.label):map(function(labelPart) return labelPart.value end):join("")
-		end
-		label = vim.trim(label:gsub("^:", ""):gsub(":$", ""))
+		if lnum + 1 == row then
+			local col = hint.position.character
+			-- label is either string or `InlayHintLabelPart[]` https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHint
+			local label = hint.label
+			if type(label) ~= "string" then
+				label = vim.iter(hint.label)
+					:map(function(labelPart) return labelPart.value end)
+					:join("")
+			end
+			label = vim.trim(label:gsub("^:", ""):gsub(":$", ""))
 
-		-- 1: type, 2: parameter -- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHintKind
-		local kind
-		if hint.kind == 1 then
-			kind = "type"
-		elseif hint.kind == 2 then
-			kind = "parameter"
-		elseif hint.kind == nil then
-			kind = "unknown"
-		else
-			kind = "offspec"
-		end
+			-- 1: type, 2: parameter -- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHintKind
+			local kind
+			if hint.kind == 1 then
+				kind = "type"
+			elseif hint.kind == 2 then
+				kind = "parameter"
+			elseif hint.kind == nil then
+				kind = "unknown"
+			else
+				kind = "offspec"
+			end
 
-		if not acc[lnum] then acc[lnum] = {} end
-		table.insert(acc[lnum], { label = label, col = col, kind = kind })
+			if not acc[lnum] then acc[lnum] = {} end
+			table.insert(acc[lnum], { label = label, col = col, kind = kind })
+		end
 		return acc
 	end)
 
